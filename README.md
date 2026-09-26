@@ -20,13 +20,23 @@ By masquerading as the official Claude CLI, `claudem` allows external AI coding 
 
 ## Installation
 
-Ensure you have [Go](https://go.dev/) 1.27+ installed, then clone and build the project:
+**Prebuilt binaries** for macOS, Linux, and Windows (amd64/arm64) are on the [releases page](https://github.com/bzzimmy/claudem/releases). Download the archive for your platform, extract it, and put `claudem` on your `PATH`.
+
+**With Go** 1.27+ installed:
+
+```bash
+go install github.com/bzzimmy/claudem@latest
+```
+
+**From source:**
 
 ```bash
 git clone https://github.com/bzzimmy/claudem.git
 cd claudem
 go build -o claudem .
 ```
+
+Check your install with `claudem -version`.
 
 ## Usage
 
@@ -63,6 +73,7 @@ You can configure `claudem` via command-line flags:
 -rewrites string   JSON file with extra system-prompt rewrite rules for fingerprinted harnesses
 -token string      static OAuth token (skips keychain/file and refresh); defaults to $CLAUDE_CODE_OAUTH_TOKEN
 -v                 log every request
+-version           print version and exit
 ```
 
 ## Fingerprint Evasion & Custom Rewrites

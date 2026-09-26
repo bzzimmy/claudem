@@ -7,10 +7,12 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/bzzimmy/claudem/internal/creds"
@@ -19,7 +21,12 @@ import (
 	"github.com/bzzimmy/claudem/internal/rewrite"
 )
 
+// version is set at build time by GoReleaser (-X main.version=...). For
+// `go install` builds it falls back to the module version from build info.
+var version = "dev"
+
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
 	listen := flag.String("listen", "127.0.0.1:8787", "address to listen on")
 	upstream := flag.String("upstream", "https://api.anthropic.com", "Anthropic API base URL")
 	fullBetas := flag.Bool("full-betas", false, "send Claude Code's full anthropic-beta list instead of the minimal one")
@@ -27,6 +34,11 @@ func main() {
 	rewrites := flag.String("rewrites", "", "JSON file with extra system-prompt rewrite rules for fingerprinted harnesses")
 	verbose := flag.Bool("v", false, "log every request")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("claudem", resolveVersion())
+		return
+	}
 
 	slog.SetDefault(slog.New(logging.New(os.Stderr)))
 
@@ -45,7 +57,7 @@ func main() {
 	if err != nil {
 		fatal("listen", err)
 	}
-	slog.Info("claudem listening", "addr", "http://"+ln.Addr().String(), "upstream", *upstream)
+	slog.Info("claudem listening", "version", resolveVersion(), "addr", "http://"+ln.Addr().String(), "upstream", *upstream)
 	reportCredentials(mgr)
 	slog.Info("rewrite rules loaded", "harnesses", rw.Names())
 
@@ -78,6 +90,16 @@ func loadRewrites(path string) ([]rewrite.Harness, error) {
 		return nil, nil
 	}
 	return rewrite.LoadFile(path)
+}
+
+func resolveVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return version
 }
 
 func fatal(msg string, err error) {
