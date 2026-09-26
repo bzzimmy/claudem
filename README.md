@@ -137,9 +137,9 @@ Choose another tool if you need an OpenAI-compatible endpoint, access to multipl
 
 ## Disclaimer
 
-This project is not affiliated with or endorsed by Anthropic. As of April 4, 2026, Anthropic's policy requires third-party harnesses to use pay-as-you-go billing or an API key, rather than drawing from Claude subscription limits. claudem relies on unsupported behavior and works around the fingerprinting Anthropic uses to enforce this policy.
+This project is not affiliated with Anthropic. `claudem` relies on unsupported behavior to bypass fingerprinting, allowing third-party tools to use Claude subscription limits instead of API billing.
 
-Because it modifies headers and prompts to masquerade as the official client, claudem may stop working at any time. Using this tool may violate Anthropic's terms of service and could affect your account standing. You are solely responsible for reviewing their terms and for any consequences of using this software, which is provided without warranty. The supported route for integrating Claude is building on the Claude Agent SDK or the official `claude` CLI.
+This may violate Anthropic's Terms of Service and could affect your account. The tool is provided without warranty, may break at any time, and you are solely responsible for its use. For supported integration, use the Claude Agent SDK or official `claude` CLI.
 
 ## License
 
