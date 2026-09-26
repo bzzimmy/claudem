@@ -58,7 +58,10 @@ For tools with their own provider configuration, override the base URL on the **
 
 - **Pi** (`~/.pi/agent/models.json`): `"providers": {"anthropic": {"baseUrl": "http://127.0.0.1:8787", "apiKey": "x"}}`
 - **OpenCode** (`opencode.json`): `"provider": {"anthropic": {"options": {"baseURL": "http://127.0.0.1:8787/v1", "apiKey": "x"}}}`
-- **Cline / Roo / Kilo**: Anthropic provider → "Use custom base URL" → `http://127.0.0.1:8787`
+- **Cline** (extension): Anthropic provider → "Use custom base URL" → `http://127.0.0.1:8787/v1`. **Cline CLI**: `cline auth -p anthropic -k x -m claude-sonnet-4-5`, then add `"baseUrl": "http://127.0.0.1:8787/v1"` to the `anthropic.settings` object in `~/.cline/data/settings/providers.json` (`cline auth --baseurl` rejects Anthropic)
+- **Roo / Kilo**: Anthropic provider → "Use custom base URL" → `http://127.0.0.1:8787`
+- **GitHub Copilot CLI** (BYOK): `COPILOT_PROVIDER_TYPE=anthropic COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787 COPILOT_PROVIDER_API_KEY=x COPILOT_MODEL=claude-sonnet-4-5 copilot`
+- **Hermes Agent** (`~/.hermes/config.yaml`): `"providers": {"claudem": {"api": "http://127.0.0.1:8787", "api_key": "x", "transport": "anthropic_messages"}}` then `hermes chat --provider claudem --model claude-sonnet-4-5`
 
 The proxy also serves `GET /healthz` (credential status) and `GET /usage` (your 5-hour and 7-day utilization).
 
