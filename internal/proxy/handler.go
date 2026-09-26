@@ -59,6 +59,7 @@ func New(upstream string, tokens *creds.Manager, rw *rewrite.Rewriter, fullBetas
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	r.URL.Path = normalizePath(r.URL.Path)
 	switch {
 	case r.URL.Path == "/healthz":
 		h.healthz(w, r)
@@ -84,6 +85,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		h.forward(w, r, nil)
 	}
+}
+
+// normalizePath tolerates common client misconfigurations: a base URL that
+// already ends in /v1 (yielding /v1/v1/...) and an /anthropic prefix some
+// multi-provider clients add.
+func normalizePath(p string) string {
+	p = strings.TrimPrefix(p, "/anthropic")
+	for strings.HasPrefix(p, "/v1/v1/") {
+		p = p[len("/v1"):]
+	}
+	if p == "" {
+		p = "/"
+	}
+	return p
 }
 
 func (h *Handler) healthz(w http.ResponseWriter, r *http.Request) {

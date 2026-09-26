@@ -72,3 +72,44 @@ func TestForwardHeadersAndDiagnostic(t *testing.T) {
 		t.Fatalf("system rewrite: %s", gotBody)
 	}
 }
+
+func TestNormalizePath(t *testing.T) {
+	cases := map[string]string{
+		"/v1/messages":              "/v1/messages",
+		"/v1/v1/messages":           "/v1/messages",
+		"/v1/v1/v1/messages":        "/v1/messages",
+		"/anthropic/v1/messages":    "/v1/messages",
+		"/anthropic/v1/v1/messages": "/v1/messages",
+		"/anthropic":                "/",
+		"/healthz":                  "/healthz",
+		"/v1/models":                "/v1/models",
+	}
+	for in, want := range cases {
+		if got := normalizePath(in); got != want {
+			t.Errorf("normalizePath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestNormalizePathRoutesToMessages(t *testing.T) {
+	var gotPath string
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer up.Close()
+
+	h, err := New(up.URL, creds.NewManager(nil, "tok"), rewrite.New(), false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/v1/messages", strings.NewReader(`{"model":"m","messages":[]}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if gotPath != "/v1/messages" {
+		t.Fatalf("upstream path = %q", gotPath)
+	}
+	if req.URL.Query().Get("beta") != "true" {
+		t.Fatalf("messages route not taken: %s", req.URL.String())
+	}
+}
