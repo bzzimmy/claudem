@@ -42,6 +42,15 @@ func New(harnesses ...[]Harness) *Rewriter {
 	return r
 }
 
+// Names lists the configured harnesses in application order.
+func (r *Rewriter) Names() []string {
+	names := make([]string, 0, len(r.harnesses))
+	for _, h := range r.harnesses {
+		names = append(names, h.Name)
+	}
+	return names
+}
+
 // Apply rewrites text and returns the names of harnesses whose rules matched.
 func (r *Rewriter) Apply(text string) (string, []string) {
 	var hit []string
