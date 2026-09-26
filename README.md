@@ -76,6 +76,24 @@ You can configure `claudem` via command-line flags:
 -version           print version and exit
 ```
 
+### Running as a background service
+
+To run claudem continuously, use the built-in service manager. This creates a native user service that starts at login and restarts automatically on a crash. Windows is not supported.
+
+```bash
+claudem service install -listen 127.0.0.1:8787 -v
+```
+
+Any flags appended to the `install` command are passed directly to the claudem daemon. On macOS, this writes a per-user launchd LaunchAgent to `~/Library/LaunchAgents/com.bzzimmy.claudem.plist` and writes logs to `~/Library/Logs/claudem.log`. A per-user agent is required on macOS so the service can access the login session's Keychain. On Linux, it writes a systemd user unit to `~/.config/systemd/user/claudem.service` and logs can be read via `journalctl --user -u claudem`.
+
+The service configuration uses the absolute path to the binary. If you move or rebuild the binary, you must run the install command again to update the path. Reinstalling overwrites the previous service definition.
+
+```bash
+claudem service uninstall
+```
+
+This command stops the background process and removes the service files.
+
 ## Fingerprint Evasion & Custom Rewrites
 
 Anthropic attempts to identify third-party tools by fingerprinting their boilerplate system prompts (checking for exact known phrases). If detected, it may reject unmetered usage and return a 400 error indicating: `"Third-party apps now draw from your extra usage"`.
@@ -99,6 +117,26 @@ If you are using a different tool that gets fingerprinted, `claudem` will warn y
 ```
 
 Then run `claudem -rewrites rewrites.json`.
+
+## How claudem compares
+
+claudem is a local reverse proxy for the native Anthropic Messages API with the smallest possible footprint. It is a single static Go binary with zero third-party dependencies that reads and writes Claude Code's credentials, passes the API through untouched, and injects identity headers and rewrite rules to masquerade as the official client. It deliberately excludes multi-provider support, multi-account load balancing, and protocol translation.
+
+| Project | Approach | Best for |
+|---|---|---|
+| claudem | Single Go binary, native API passthrough, header/prompt masquerade | Smallest footprint, strict Anthropic API compatibility, user-extensible rewrite rules |
+| CLIProxyAPI | Large Go proxy with multi-account routing and format translation | Users needing multiple providers, account load balancing, Docker, or OpenAI-compatible endpoints |
+| Node/Python proxies | Header/prompt masquerade via npm or venv scripts | Existing Node or Python environments |
+| CLI/Agent-SDK delegates | Shells out to `claude` CLI or Agent SDK, reconstructs streaming | Sanctioned API usage, avoiding direct API masquerade |
+| OpenCode plugins | OAuth implementation inside the tool itself | Users only needing Claude access within a single tool |
+
+Choose another tool if you need an OpenAI-compatible endpoint, access to multiple AI providers, Docker containerization, or a management API. If you prefer to use Anthropic's sanctioned approach, use a proxy that delegates to the Claude Agent SDK rather than interacting directly with the API.
+
+## Disclaimer
+
+This project is not affiliated with or endorsed by Anthropic. As of April 4, 2026, Anthropic's policy requires third-party harnesses to use pay-as-you-go billing or an API key, rather than drawing from Claude subscription limits. claudem relies on unsupported behavior and works around the fingerprinting Anthropic uses to enforce this policy.
+
+Because it modifies headers and prompts to masquerade as the official client, claudem may stop working at any time. Using this tool may violate Anthropic's terms of service and could affect your account standing. You are solely responsible for reviewing their terms and for any consequences of using this software, which is provided without warranty. The supported route for integrating Claude is building on the Claude Agent SDK or the official `claude` CLI.
 
 ## License
 
