@@ -88,12 +88,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // normalizePath tolerates common client misconfigurations: a base URL that
-// already ends in /v1 (yielding /v1/v1/...) and an /anthropic prefix some
-// multi-provider clients add.
+// already ends in /v1 (yielding /v1/v1/...), one that is missing /v1 for
+// clients that expect it included (yielding /messages), and an /anthropic
+// prefix some multi-provider clients add.
 func normalizePath(p string) string {
 	p = strings.TrimPrefix(p, "/anthropic")
 	for strings.HasPrefix(p, "/v1/v1/") {
 		p = p[len("/v1"):]
+	}
+	for _, root := range []string{"/messages", "/models", "/complete"} {
+		if p == root || strings.HasPrefix(p, root+"/") {
+			p = "/v1" + p
+			break
+		}
 	}
 	if p == "" {
 		p = "/"

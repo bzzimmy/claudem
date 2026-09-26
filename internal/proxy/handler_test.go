@@ -83,6 +83,13 @@ func TestNormalizePath(t *testing.T) {
 		"/anthropic":                "/",
 		"/healthz":                  "/healthz",
 		"/v1/models":                "/v1/models",
+		"/messages":                 "/v1/messages",
+		"/messages/count_tokens":    "/v1/messages/count_tokens",
+		"/models":                   "/v1/models",
+		"/models/claude-x":          "/v1/models/claude-x",
+		"/anthropic/messages":       "/v1/messages",
+		"/usage":                    "/usage",
+		"/messagesx":                "/messagesx",
 	}
 	for in, want := range cases {
 		if got := normalizePath(in); got != want {
