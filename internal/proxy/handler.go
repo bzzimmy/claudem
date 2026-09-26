@@ -16,20 +16,26 @@ import (
 
 	"github.com/bzzimmy/claudem/internal/ccident"
 	"github.com/bzzimmy/claudem/internal/creds"
+	"github.com/bzzimmy/claudem/internal/rewrite"
 )
+
+// thirdPartyMarker is the upstream error text when the system prompt matched a
+// known third-party harness fingerprint.
+const thirdPartyMarker = "Third-party apps now draw from your extra usage"
 
 const maxBody = 64 << 20
 
 type Handler struct {
 	upstream  *url.URL
 	tokens    *creds.Manager
+	rewriter  *rewrite.Rewriter
 	betas     []string
 	sessionID string
 	client    *http.Client
 	verbose   bool
 }
 
-func New(upstream string, tokens *creds.Manager, fullBetas, verbose bool) (*Handler, error) {
+func New(upstream string, tokens *creds.Manager, rw *rewrite.Rewriter, fullBetas, verbose bool) (*Handler, error) {
 	u, err := url.Parse(upstream)
 	if err != nil {
 		return nil, err
@@ -41,6 +47,7 @@ func New(upstream string, tokens *creds.Manager, fullBetas, verbose bool) (*Hand
 	return &Handler{
 		upstream:  u,
 		tokens:    tokens,
+		rewriter:  rw,
 		betas:     betas,
 		sessionID: newUUID(),
 		verbose:   verbose,
@@ -69,7 +76,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		q.Set("beta", "true")
 		r.URL.RawQuery = q.Encode()
-		h.forward(w, r, injectSystemPrefix(body))
+		body, hit := prepareMessages(body, h.rewriter)
+		if h.verbose && len(hit) > 0 {
+			slog.Info("rewrote system prompt", "harness", hit)
+		}
+		h.forward(w, r, body)
 	default:
 		h.forward(w, r, nil)
 	}
@@ -127,10 +138,25 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, body []byte) {
 		w.Header()[k] = v
 	}
 	w.WriteHeader(resp.StatusCode)
-	n, _ := copyFlush(w, resp.Body)
+	var src io.Reader = resp.Body
+	if resp.StatusCode == http.StatusBadRequest {
+		src = h.diagnoseBadRequest(resp.Body)
+	}
+	n, _ := copyFlush(w, src)
 	if h.verbose || resp.StatusCode >= 400 {
 		slog.Info("proxied", "method", r.Method, "path", r.URL.Path, "status", resp.StatusCode, "bytes", n, "dur", time.Since(start).Round(time.Millisecond))
 	}
+}
+
+// diagnoseBadRequest peeks at a 400 body and logs an actionable hint when the
+// system prompt was fingerprinted as a third-party harness.
+func (h *Handler) diagnoseBadRequest(body io.Reader) io.Reader {
+	peek, _ := io.ReadAll(io.LimitReader(body, 4096))
+	if bytes.Contains(peek, []byte(thirdPartyMarker)) {
+		slog.Warn("system prompt matched Anthropic's third-party harness fingerprint; " +
+			"add a rewrite rule for this client (see --rewrites)")
+	}
+	return io.MultiReader(bytes.NewReader(peek), body)
 }
 
 func (h *Handler) setHeaders(dst, src http.Header, token string) {

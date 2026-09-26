@@ -23,12 +23,12 @@ const (
 // even that is currently optional; both are harmless.
 var BaseBetas = []string{"claude-code-20250219", "oauth-2025-04-20"}
 
-// FullBetas is the list Claude Code 2.1.283 sends on inference requests.
-// Opt-in via --full-betas since some flags change semantics (e.g. context-1m).
+// FullBetas is the list Claude Code 2.1.283 sends on inference requests, minus
+// context-1m-2025-08-07: that flag turns every request into a "long context
+// request" that requires usage credits, even tiny ones. Opt-in via --full-betas.
 var FullBetas = []string{
 	"claude-code-20250219",
 	"oauth-2025-04-20",
-	"context-1m-2025-08-07",
 	"interleaved-thinking-2025-05-14",
 	"redact-thinking-2026-02-12",
 	"thinking-token-count-2026-05-13",
