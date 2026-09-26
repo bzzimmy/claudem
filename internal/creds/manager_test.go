@@ -77,6 +77,18 @@ func TestTokenPrefersFreshStoreOverRefresh(t *testing.T) {
 	}
 }
 
+func TestParseFractionalExpiresAt(t *testing.T) {
+	for _, in := range []string{`1790453738680.9412`, `1790453738680`, `1.7904537386809412e12`} {
+		c, err := parse([]byte(`{"claudeAiOauth":{"accessToken":"a","refreshToken":"r","expiresAt":` + in + `}}`))
+		if err != nil {
+			t.Fatalf("%s: %v", in, err)
+		}
+		if c.ExpiresAt != 1790453738680 {
+			t.Fatalf("%s: expiresAt=%d", in, c.ExpiresAt)
+		}
+	}
+}
+
 func itoa(n int64) string {
 	b, _ := json.Marshal(n)
 	return string(b)

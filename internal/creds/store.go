@@ -92,6 +92,33 @@ type Credentials struct {
 	RateLimitTier    string `json:"rateLimitTier"`
 }
 
+// UnmarshalJSON tolerates a fractional expiresAt: recent Claude Code builds
+// write the value as a float (e.g. 1790453738680.9412).
+func (c *Credentials) UnmarshalJSON(b []byte) error {
+	type plain Credentials
+	var aux struct {
+		*plain
+		ExpiresAt json.Number `json:"expiresAt"`
+	}
+	aux.plain = (*plain)(c)
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	if aux.ExpiresAt == "" {
+		return nil
+	}
+	if n, err := aux.ExpiresAt.Int64(); err == nil {
+		c.ExpiresAt = n
+		return nil
+	}
+	f, err := aux.ExpiresAt.Float64()
+	if err != nil {
+		return fmt.Errorf("expiresAt: %w", err)
+	}
+	c.ExpiresAt = int64(f)
+	return nil
+}
+
 // parse extracts credentials while keeping the raw document so unknown fields
 // survive a write-back.
 func parse(raw []byte) (Credentials, error) {
