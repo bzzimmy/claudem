@@ -1,6 +1,12 @@
-# claudem
+<p align="center">
+  <img src="assets/logo.svg" alt="claudem logo" width="130" height="130" />
+</p>
 
-`claudem` is a local Anthropic API reverse proxy that automatically reuses your [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) OAuth credentials. 
+<h1 align="center">claudem</h1>
+
+<p align="center">
+  A local Anthropic API reverse proxy that automatically reuses your <a href="https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview">Claude Code</a> OAuth credentials.
+</p>
 
 By masquerading as the official Claude CLI, `claudem` allows external AI coding tools and agents (like Pi, OpenCode, Cline, or Aider) to use Claude Code's authentication and count against your subscription's plan limits instead of API billing.
 
