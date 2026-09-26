@@ -2,6 +2,8 @@
 // subscription credentials.
 //
 //	ANTHROPIC_BASE_URL=http://127.0.0.1:8787 ANTHROPIC_API_KEY=x <your tool>
+//
+// Run "claudem service install [flags]" to keep it running in the background.
 package main
 
 import (
@@ -12,13 +14,17 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"path/filepath"
 	"runtime/debug"
+	"syscall"
 	"time"
 
 	"github.com/bzzimmy/claudem/internal/creds"
 	"github.com/bzzimmy/claudem/internal/logging"
 	"github.com/bzzimmy/claudem/internal/proxy"
 	"github.com/bzzimmy/claudem/internal/rewrite"
+	"github.com/bzzimmy/claudem/internal/service"
 )
 
 // version is set at build time by GoReleaser (-X main.version=...). For
@@ -26,6 +32,14 @@ import (
 var version = "dev"
 
 func main() {
+	slog.SetDefault(slog.New(logging.New(os.Stderr)))
+	if len(os.Args) > 1 && os.Args[1] == "service" {
+		if err := runService(os.Args[2:]); err != nil {
+			fatal("service", err)
+		}
+		return
+	}
+
 	showVersion := flag.Bool("version", false, "print version and exit")
 	listen := flag.String("listen", "127.0.0.1:8787", "address to listen on")
 	upstream := flag.String("upstream", "https://api.anthropic.com", "Anthropic API base URL")
@@ -40,8 +54,6 @@ func main() {
 		return
 	}
 
-	slog.SetDefault(slog.New(logging.New(os.Stderr)))
-
 	extra, err := loadRewrites(*rewrites)
 	if err != nil {
 		fatal("load rewrites", err)
@@ -53,7 +65,10 @@ func main() {
 		fatal("configure proxy", err)
 	}
 
-	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", *listen)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", *listen)
 	if err != nil {
 		fatal("listen", err)
 	}
@@ -62,8 +77,76 @@ func main() {
 	slog.Info("rewrite rules loaded", "harnesses", rw.Names())
 
 	srv := &http.Server{Handler: h, ReadHeaderTimeout: 30 * time.Second}
-	if err := srv.Serve(ln); err != nil {
+	errc := make(chan error, 1)
+	go func() { errc <- srv.Serve(ln) }()
+
+	select {
+	case err := <-errc:
 		fatal("server", err)
+	case <-ctx.Done():
+		stop()
+		slog.Info("shutting down", "grace", shutdownGrace)
+		sctx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
+		defer cancel()
+		if err := srv.Shutdown(sctx); err != nil {
+			slog.Warn("shutdown incomplete, closing", "err", err)
+			_ = srv.Close()
+		}
+	}
+}
+
+// shutdownGrace bounds how long in-flight (possibly streaming) requests may
+// take to finish after SIGINT/SIGTERM before connections are closed.
+const shutdownGrace = 30 * time.Second
+
+const serviceUsage = `usage: claudem service <install|uninstall> [claudem flags...]
+
+  install     write a per-user launchd agent (macOS) or systemd user unit (Linux)
+              that runs claudem at login with the given flags, and start it
+  uninstall   stop the service and remove the unit file
+
+example: claudem service install -listen 127.0.0.1:8787 -v
+`
+
+func runService(args []string) error {
+	if len(args) == 0 {
+		fmt.Fprint(os.Stderr, serviceUsage)
+		os.Exit(2)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	switch args[0] {
+	case "install":
+		bin, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		if resolved, rerr := filepath.EvalSymlinks(bin); rerr == nil {
+			bin = resolved
+		}
+		res, err := service.Install(ctx, service.Spec{Binary: bin, Args: args[1:], Home: home})
+		if err != nil {
+			return err
+		}
+		slog.Info("service installed and started", "unit", res.Path, "binary", bin, "logs", res.Logs)
+		return nil
+	case "uninstall":
+		res, err := service.Uninstall(ctx, home)
+		if err != nil {
+			return err
+		}
+		slog.Info("service removed", "unit", res.Path)
+		return nil
+	case "-h", "--help", "help":
+		fmt.Fprint(os.Stderr, serviceUsage)
+		return nil
+	default:
+		fmt.Fprint(os.Stderr, serviceUsage)
+		return fmt.Errorf("unknown service command %q", args[0])
 	}
 }
 
